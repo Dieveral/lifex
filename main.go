@@ -43,6 +43,21 @@ func main() {
 func executeCommand(command *commands.Command, db *sql.DB) error {
 
 	switch strings.ToLower(command.Name) {
+	case "add":
+		if command.Target == "" {
+			return fmt.Errorf("command target is not specified")
+		} else {
+			switch strings.ToLower(command.Target) {
+			case "company":
+				if val, ok := command.Args["name"]; ok {
+					if err := addCompany(val); err != nil {
+
+					}
+				} else {
+					return fmt.Errorf("company name is not specified")
+				}
+			}
+		}
 	case "check":
 		fmt.Println("...checking database connection")
 		if err := db.Ping(); err != nil {
@@ -52,10 +67,17 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 			fmt.Println("SUCCESS: Database is connected.")
 		}
 	case "help":
-		fmt.Println("...list of available commands:")
-		fmt.Println("check - checks database connection")
-		fmt.Println("help - shows help")
-		fmt.Println("exit - closes application")
+		switch command.Target {
+		case "":
+			fmt.Println("...list of available commands:")
+			fmt.Println("add [table] <column1>=<value1> <column2>=<value2> ... - adds record to [table] with <column>=<value> pairs")
+			fmt.Println("check - checks database connection")
+			fmt.Println("exit - closes application")
+			fmt.Println("help <command> - shows help for <command>. If command is not specified, total help is shown")
+		case "add":
+
+		}
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
@@ -70,4 +92,9 @@ func readCommand(reader *bufio.Reader) *commands.Command {
 
 	line, _ := reader.ReadString('\n')
 	return commands.Parse(line)
+}
+
+// Returns company id, if
+func addCommand(name string) (int, error) {
+
 }
