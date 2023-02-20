@@ -104,5 +104,6 @@ func (command Command) String() string {
 }
 
 func (command *Command) AddArgument(name string, value string) {
-	command.Args[name] = value
+	key := strings.ToLower(name)
+	command.Args[key] = value
 }

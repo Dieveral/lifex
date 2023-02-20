@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"lifex/commands"
+	"lifex/entities"
 	"os"
 	"strings"
 
@@ -49,9 +50,11 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 		} else {
 			switch strings.ToLower(command.Target) {
 			case "company":
-				if val, ok := command.Args["name"]; ok {
-					if err := addCompany(val); err != nil {
-
+				if name, ok := command.Args["name"]; ok {
+					if id, err := addCompany(name, db); err == nil {
+						fmt.Printf("Company '%s' was successfully added with Id=%d\n", name, id)
+					} else {
+						return err
 					}
 				} else {
 					return fmt.Errorf("company name is not specified")
@@ -66,8 +69,25 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 		} else {
 			fmt.Println("SUCCESS: Database is connected.")
 		}
+	case "getid":
+		if command.Target == "" {
+			return fmt.Errorf("command target is not specified")
+		} else {
+			switch strings.ToLower(command.Target) {
+			case "company":
+				if name, ok := command.Args["name"]; ok {
+					if id, err := getCompanyId(name, db); err == nil {
+						fmt.Printf("Company '%s' has Id=%d\n", name, id)
+					} else {
+						return err
+					}
+				} else {
+					return fmt.Errorf("company name is not specified")
+				}
+			}
+		}
 	case "help":
-		switch command.Target {
+		switch strings.ToLower(command.Target) {
 		case "":
 			fmt.Println("...list of available commands:")
 			fmt.Println("add [table] <column1>=<value1> <column2>=<value2> ... - adds record to [table] with <column>=<value> pairs")
@@ -77,7 +97,24 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 		case "add":
 
 		}
-
+	case "show":
+		if command.Target == "" {
+			return fmt.Errorf("command target is not specified")
+		} else {
+			switch strings.ToLower(command.Target) {
+			case "company":
+				if val, ok := command.Args["id"]; ok {
+					atoi
+					if id, err := getCompanyId(name, db); err == nil {
+						fmt.Printf("Company '%s' has Id=%d\n", name, id)
+					} else {
+						return err
+					}
+				} else {
+					return fmt.Errorf("company name is not specified")
+				}
+			}
+		}
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
@@ -94,7 +131,40 @@ func readCommand(reader *bufio.Reader) *commands.Command {
 	return commands.Parse(line)
 }
 
-// Returns company id, if
-func addCommand(name string) (int, error) {
+func getCompanyId(name string, db *sql.DB) (int64, error) {
 
+	row := db.QueryRow("select Id from lifex.company where Name=?", name)
+
+	var id int64
+	err := row.Scan(&id)
+	if err != nil {
+		return 0, err
+	} else {
+		return id, nil
+	}
+}
+
+// If operation is successful, returns id of the added company
+func addCompany(name string, db *sql.DB) (int64, error) {
+
+	result, err := db.Exec("insert into lifex.company (Name) values (?)", name)
+	if err != nil {
+		return 0, err
+	} else {
+		return result.LastInsertId()
+	}
+}
+
+func showCompanyById(id int64, db *sql.DB) {
+
+	fmt.Println(" ________ ________ ")
+	fmt.Println("|   ID   |  Name  |")
+	fmt.Println("|________|________|")
+
+	row := db.QueryRow("select Id, Name from lifex.company where Id=?", id)
+	company := entities.Company{}
+	row.Scan(&company.Id, &company.Name)
+
+	fmt.Printf("|%8d|%8s|\n", company.Id, company.Name)
+	fmt.Println("|________|________|")
 }
