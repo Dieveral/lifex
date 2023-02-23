@@ -7,6 +7,7 @@ import (
 	"lifex/commands"
 	"lifex/entities"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -104,14 +105,25 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 			switch strings.ToLower(command.Target) {
 			case "company":
 				if val, ok := command.Args["id"]; ok {
-					atoi
-					if id, err := getCompanyId(name, db); err == nil {
-						fmt.Printf("Company '%s' has Id=%d\n", name, id)
-					} else {
+
+					id, err := strconv.ParseInt(val, 10, 0)
+					if err != nil {
+						return err
+					}
+
+					if err = showCompanyById(id, db); err != nil {
+						return err
+					}
+				} else if name, ok := command.Args["name"]; ok {
+
+					if err := showCompanyByName(name, db); err != nil {
 						return err
 					}
 				} else {
-					return fmt.Errorf("company name is not specified")
+
+					if err := showAllCompanies(db); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -155,16 +167,106 @@ func addCompany(name string, db *sql.DB) (int64, error) {
 	}
 }
 
-func showCompanyById(id int64, db *sql.DB) {
-
-	fmt.Println(" ________ ________ ")
-	fmt.Println("|   ID   |  Name  |")
-	fmt.Println("|________|________|")
+func showCompanyById(id int64, db *sql.DB) error {
 
 	row := db.QueryRow("select Id, Name from lifex.company where Id=?", id)
 	company := entities.Company{}
-	row.Scan(&company.Id, &company.Name)
+	err := row.Scan(&company.Id, &company.Name)
+	if err != nil {
+		return err
+	}
 
-	fmt.Printf("|%8d|%8s|\n", company.Id, company.Name)
-	fmt.Println("|________|________|")
+	idWidth := max(4, len(fmt.Sprint(company.Id)))
+	nameWidth := max(6, strlen(company.Name))
+
+	printCompanyHeader(idWidth, nameWidth)
+	printCompanyInfo(company, idWidth, nameWidth)
+	printCompanyFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func showCompanyByName(name string, db *sql.DB) error {
+
+	row := db.QueryRow("select Id, Name from lifex.company where Name=?", name)
+	company := entities.Company{}
+	err := row.Scan(&company.Id, &company.Name)
+	if err != nil {
+		return err
+	}
+
+	idWidth := max(4, len(fmt.Sprint(company.Id)))
+	nameWidth := max(6, strlen(company.Name))
+
+	printCompanyHeader(idWidth, nameWidth)
+	printCompanyInfo(company, idWidth, nameWidth)
+	printCompanyFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func showAllCompanies(db *sql.DB) error {
+
+	var companies []entities.Company
+
+	rows, err := db.Query("select Id, Name from lifex.company")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	idWidth := 4
+	nameWidth := 6
+
+	for rows.Next() {
+		var company entities.Company
+		rows.Scan(&company.Id, &company.Name)
+		companies = append(companies, company)
+
+		idWidth = max(idWidth, len(fmt.Sprint(company.Id)))
+		nameWidth = max(nameWidth, strlen(company.Name))
+	}
+
+	printCompanyHeader(idWidth, nameWidth)
+	for _, company := range companies {
+		printCompanyInfo(company, idWidth, nameWidth)
+	}
+	printCompanyFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func printCompanyInfo(company entities.Company, idWidth int, nameWidth int) {
+
+	idw := len(fmt.Sprint(company.Id))
+	nw := strlen(company.Name)
+
+	fmt.Printf("|%s%d|%s%s|\n", strings.Repeat(" ", idWidth-idw), company.Id, company.Name, strings.Repeat(" ", nameWidth-nw))
+}
+
+func printCompanyHeader(idWidth int, nameWidth int) {
+
+	idIndent := (idWidth - 2) / 2
+	nameIndent := (nameWidth - 4) / 2
+
+	fmt.Printf(" %s %s \n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+	fmt.Printf("|%sID%s|%sName%s|\n", strings.Repeat(" ", idWidth-idIndent-2), strings.Repeat(" ", idIndent), strings.Repeat(" ", nameWidth-nameIndent-4), strings.Repeat(" ", nameIndent))
+	fmt.Printf("|%s|%s|\n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+}
+
+func printCompanyFooter(idWidth int, nameWidth int) {
+	fmt.Printf("|%s|%s|\n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+}
+
+func max(value int, newValue int) int {
+
+	if newValue > value {
+		return newValue
+	} else {
+		return value
+	}
+}
+
+func strlen(text string) int {
+	return len([]rune(text))
 }
