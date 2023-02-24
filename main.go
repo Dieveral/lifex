@@ -60,6 +60,16 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 				} else {
 					return fmt.Errorf("company name is not specified")
 				}
+			case "city":
+				if name, ok := command.Args["name"]; ok {
+					if id, err := addCity(name, db); err == nil {
+						fmt.Printf("City '%s' was successfully added with Id=%d\n", name, id)
+					} else {
+						return err
+					}
+				} else {
+					return fmt.Errorf("city name is not specified")
+				}
 			}
 		}
 	case "check":
@@ -125,6 +135,28 @@ func executeCommand(command *commands.Command, db *sql.DB) error {
 						return err
 					}
 				}
+			case "city":
+				if val, ok := command.Args["id"]; ok {
+
+					id, err := strconv.ParseInt(val, 10, 0)
+					if err != nil {
+						return err
+					}
+
+					if err = showCityById(id, db); err != nil {
+						return err
+					}
+				} else if name, ok := command.Args["name"]; ok {
+
+					if err := showCityByName(name, db); err != nil {
+						return err
+					}
+				} else {
+
+					if err := showAllCities(db); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	default:
@@ -156,8 +188,26 @@ func getCompanyId(name string, db *sql.DB) (int64, error) {
 	}
 }
 
+func companyExists(name string, db *sql.DB) bool {
+
+	row := db.QueryRow("select Count(1) from lifex.company where Name=?", name)
+
+	var res int
+	row.Scan(&res)
+
+	if res == 1 {
+		return true
+	} else {
+		return false
+	}
+}
+
 // If operation is successful, returns id of the added company
 func addCompany(name string, db *sql.DB) (int64, error) {
+
+	if companyExists(name, db) {
+		return 0, fmt.Errorf("company '%s' already exists", name)
+	}
 
 	result, err := db.Exec("insert into lifex.company (Name) values (?)", name)
 	if err != nil {
@@ -255,6 +305,125 @@ func printCompanyHeader(idWidth int, nameWidth int) {
 }
 
 func printCompanyFooter(idWidth int, nameWidth int) {
+	fmt.Printf("|%s|%s|\n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+}
+
+func cityExists(name string, db *sql.DB) bool {
+
+	row := db.QueryRow("select Count(1) from lifex.city where Name=?", name)
+
+	var res int
+	row.Scan(&res)
+
+	if res == 1 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func addCity(name string, db *sql.DB) (int64, error) {
+
+	if cityExists(name, db) {
+		return 0, fmt.Errorf("city '%s' already exists", name)
+	}
+
+	result, err := db.Exec("insert into lifex.city (Name) values (?)", name)
+	if err != nil {
+		return 0, err
+	} else {
+		return result.LastInsertId()
+	}
+}
+
+func showCityById(id int64, db *sql.DB) error {
+
+	row := db.QueryRow("select Id, Name from lifex.city where Id=?", id)
+	city := entities.City{}
+	err := row.Scan(&city.Id, &city.Name)
+	if err != nil {
+		return err
+	}
+
+	idWidth := max(4, len(fmt.Sprint(city.Id)))
+	nameWidth := max(6, strlen(city.Name))
+
+	printCityHeader(idWidth, nameWidth)
+	printCityInfo(city, idWidth, nameWidth)
+	printCityFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func showCityByName(name string, db *sql.DB) error {
+
+	row := db.QueryRow("select Id, Name from lifex.city where Name=?", name)
+	city := entities.City{}
+	err := row.Scan(&city.Id, &city.Name)
+	if err != nil {
+		return err
+	}
+
+	idWidth := max(4, len(fmt.Sprint(city.Id)))
+	nameWidth := max(6, strlen(city.Name))
+
+	printCityHeader(idWidth, nameWidth)
+	printCityInfo(city, idWidth, nameWidth)
+	printCityFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func showAllCities(db *sql.DB) error {
+
+	var cities []entities.City
+
+	rows, err := db.Query("select Id, Name from lifex.city")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	idWidth := 4
+	nameWidth := 6
+
+	for rows.Next() {
+		var city entities.City
+		rows.Scan(&city.Id, &city.Name)
+		cities = append(cities, city)
+
+		idWidth = max(idWidth, len(fmt.Sprint(city.Id)))
+		nameWidth = max(nameWidth, strlen(city.Name))
+	}
+
+	printCityHeader(idWidth, nameWidth)
+	for _, city := range cities {
+		printCityInfo(city, idWidth, nameWidth)
+	}
+	printCityFooter(idWidth, nameWidth)
+
+	return nil
+}
+
+func printCityInfo(city entities.City, idWidth int, nameWidth int) {
+
+	idw := len(fmt.Sprint(city.Id))
+	nw := strlen(city.Name)
+
+	fmt.Printf("|%s%d|%s%s|\n", strings.Repeat(" ", idWidth-idw), city.Id, city.Name, strings.Repeat(" ", nameWidth-nw))
+}
+
+func printCityHeader(idWidth int, nameWidth int) {
+
+	idIndent := (idWidth - 2) / 2
+	nameIndent := (nameWidth - 4) / 2
+
+	fmt.Printf(" %s %s \n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+	fmt.Printf("|%sID%s|%sName%s|\n", strings.Repeat(" ", idWidth-idIndent-2), strings.Repeat(" ", idIndent), strings.Repeat(" ", nameWidth-nameIndent-4), strings.Repeat(" ", nameIndent))
+	fmt.Printf("|%s|%s|\n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
+}
+
+func printCityFooter(idWidth int, nameWidth int) {
 	fmt.Printf("|%s|%s|\n", strings.Repeat("_", idWidth), strings.Repeat("_", nameWidth))
 }
 
